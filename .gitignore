@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sensitive directories
+.claude/
+.opencode/
+
+# Config files with secrets
+*.local.json
+config.local.json
