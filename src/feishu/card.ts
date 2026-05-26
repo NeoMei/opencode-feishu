@@ -131,42 +131,29 @@ export class FeishuCard {
       if (thinkingContent || content) elements.push({ tag: 'hr' });
     }
 
-    // Thinking section (collapsible when done)
-    if (showThinking && thinkingContent) {
-      if (done) {
-        // Collapsible thinking section when done
-        elements.push({
-          tag: 'div',
-          text: {
-            tag: 'lark_md',
-            content: `<font color='grey'>💡 *思考过程（点击展开）*</font>`,
-          },
-        });
-        elements.push({
-          tag: 'div',
-          text: {
-            tag: 'lark_md',
-            content: `<font color='grey'>${thinkingContent}</font>`,
-          },
-        });
-      } else {
-        // Show thinking inline while streaming
-        elements.push({
-          tag: 'div',
-          text: {
-            tag: 'lark_md',
-            content: `<font color='grey'>💭 ${thinkingContent}</font>`,
-          },
-        });
-      }
-      if (content) elements.push({ tag: 'hr' });
-    }
+    // Thinking + content: merge into single div to avoid extra spacing
+    const hasThinking = showThinking && thinkingContent;
+    const hasContent = !!content;
 
-    // Main content section
-    if (content) {
+    if (hasThinking || hasContent) {
+      const parts: string[] = [];
+
+      if (hasThinking) {
+        if (done) {
+          parts.push(`<font color='grey'>💡 *思考过程：*</font>`);
+          parts.push(`<font color='grey'>${thinkingContent}</font>`);
+        } else {
+          parts.push(`<font color='grey'>💭 ${thinkingContent}</font>`);
+        }
+      }
+
+      if (hasContent) {
+        parts.push(content);
+      }
+
       elements.push({
         tag: 'div',
-        text: { tag: 'lark_md', content },
+        text: { tag: 'lark_md', content: parts.join('\n\n') },
       });
     }
 

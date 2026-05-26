@@ -1,6 +1,6 @@
 {
   "name": "@neomei/opencode-feishu",
-  "version": "0.5.14",
+  "version": "0.5.15",
   "description": "Node.js-native Feishu/Lark bridge for OpenCode — production-grade daemon, persistence, preflight, structured logs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
