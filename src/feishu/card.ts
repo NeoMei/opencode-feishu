@@ -114,7 +114,6 @@ export class FeishuCard {
         tag: 'div',
         text: { tag: 'lark_md', content: `🔄 **重试中**：${retry}` },
       });
-      elements.push({ tag: 'hr' });
     }
 
     // Tools section
@@ -128,7 +127,6 @@ export class FeishuCard {
         })
         .join('\n');
       elements.push({ tag: 'div', text: { tag: 'lark_md', content: toolLines } });
-      if (thinkingContent || content) elements.push({ tag: 'hr' });
     }
 
     // Thinking + content: merge into single div to avoid extra spacing
@@ -139,41 +137,33 @@ export class FeishuCard {
       const parts: string[] = [];
 
       if (hasThinking) {
+        const trimmed = thinkingContent.trim();
         if (done) {
-          parts.push(`<font color='grey'>💡 *思考过程：*</font>`);
-          parts.push(`<font color='grey'>${thinkingContent}</font>`);
+          parts.push(`<font color='grey'>💡 *思考过程：*</font>\n<font color='grey'>${trimmed}</font>`);
         } else {
-          parts.push(`<font color='grey'>💭 ${thinkingContent}</font>`);
+          parts.push(`<font color='grey'>💭 ${trimmed}</font>`);
         }
       }
 
       if (hasContent) {
-        parts.push(content);
+        parts.push(content.trim());
       }
 
       elements.push({
         tag: 'div',
-        text: { tag: 'lark_md', content: parts.join('\n\n') },
+        text: { tag: 'lark_md', content: parts.join('\n') },
       });
     }
 
-    // Task control buttons: show when session is actively processing (not done)
+    // Stop button: small and subtle, only when actively processing
     if (!done && !interaction && !modelSelection && !agentSelection) {
-      if (elements.length > 0) elements.push({ tag: 'hr' });
       elements.push({
         tag: 'action',
-        layout: 'default',
         actions: [
           {
             tag: 'button',
-            text: { tag: 'plain_text', content: '⏸ 暂停' },
+            text: { tag: 'plain_text', content: '⏹' },
             type: 'default',
-            value: { action: 'ctrl', op: 'interrupt' },
-          },
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '⏹ 终止' },
-            type: 'danger',
             value: { action: 'ctrl', op: 'abort' },
           },
         ],
