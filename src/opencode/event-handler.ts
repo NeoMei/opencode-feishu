@@ -624,7 +624,7 @@ export class OpenCodeEventHandler {
     const thinkingContent = this.shouldShowThinking() ? (session.thinkingContent || '') : '';
     const tools = this.shouldShowTools() ? (session.tools || []) : [];
     const interaction = session.pendingInteraction;
-    log.info({ chatId, hasInteraction: !!interaction, interactionKind: interaction?.kind, targetMessageId, force: opts.force, done: opts.done }, 'flushCard');
+    log.info({ chatId, hasInteraction: !!interaction, interactionKind: interaction?.kind, targetMessageId, force: opts.force, done: opts.done, contentLen: content.length, contentPreview: JSON.stringify(content.substring(0, 200)) }, 'flushCard');
     const card = FeishuCard.createStreamingCard({
       content,
       thinkingContent,

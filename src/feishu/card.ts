@@ -108,6 +108,9 @@ export class FeishuCard {
 
     const elements: Array<{ tag: string; [key: string]: any }> = [];
 
+    // Normalize: collapse 2+ consecutive newlines into single newline to prevent blank lines in lark_md
+    const normalize = (s: string) => s.replace(/\n{2,}/g, '\n');
+
     // Retry notice
     if (retry) {
       elements.push({
@@ -126,12 +129,13 @@ export class FeishuCard {
             : head;
         })
         .join('\n');
-      elements.push({ tag: 'div', text: { tag: 'lark_md', content: toolLines } });
+      elements.push({ tag: 'div', text: { tag: 'lark_md', content: normalize(toolLines) } });
     }
 
     // Thinking + content: merge into single div to avoid extra spacing
     const hasThinking = showThinking && thinkingContent;
     const hasContent = !!content;
+    const isProcessing = !done && !interaction && !modelSelection && !agentSelection;
 
     if (hasThinking || hasContent) {
       const parts: string[] = [];
@@ -139,14 +143,18 @@ export class FeishuCard {
       if (hasThinking) {
         const trimmed = thinkingContent.trim();
         if (done) {
-          parts.push(`<font color='grey'>💡 *思考过程：*</font>\n<font color='grey'>${trimmed}</font>`);
+          parts.push(`<font color='grey'>💡 *思考过程：*</font>\n<font color='grey'>${normalize(trimmed)}</font>`);
         } else {
-          parts.push(`<font color='grey'>💭 ${trimmed}</font>`);
+          let t = `<font color='grey'>💭 ${normalize(trimmed)}</font>`;
+          if (isProcessing && !hasContent) t += ' <font color="grey">⏹</font>';
+          parts.push(t);
         }
       }
 
       if (hasContent) {
-        parts.push(content.trim());
+        let c = normalize(content.trim());
+        if (isProcessing) c += ' <font color="grey">⏹</font>';
+        parts.push(c);
       }
 
       elements.push({
@@ -155,18 +163,11 @@ export class FeishuCard {
       });
     }
 
-    // Stop button: small and subtle, only when actively processing
-    if (!done && !interaction && !modelSelection && !agentSelection) {
+    // Stop indicator: inline at end of content when processing (not a separate element)
+    if (isProcessing && !hasContent && !hasThinking) {
       elements.push({
-        tag: 'action',
-        actions: [
-          {
-            tag: 'button',
-            text: { tag: 'plain_text', content: '⏹' },
-            type: 'default',
-            value: { action: 'ctrl', op: 'abort' },
-          },
-        ],
+        tag: 'div',
+        text: { tag: 'lark_md', content: '<font color="grey">⏹</font>' },
       });
     }
 
