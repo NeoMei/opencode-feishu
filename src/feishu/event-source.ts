@@ -66,7 +66,13 @@ export class FeishuEventSource extends EventEmitter {
       domain,
       logger: silentLogger,
       autoReconnect: true,
-    });
+      wsConfig: { pingTimeout: 10 },
+      handshakeTimeoutMs: 10000,
+      onReady: () => log.info('WSClient ready'),
+      onError: (err: any) => log.error({ err }, 'WSClient error'),
+      onReconnecting: () => log.warn('WSClient reconnecting...'),
+      onReconnected: () => log.info('WSClient reconnected'),
+    } as any);
 
     const dispatcher = new Lark.EventDispatcher({}).register({
       'im.message.receive_v1': async (data) => {
@@ -143,6 +149,13 @@ export class FeishuEventSource extends EventEmitter {
   }
 
   isConnected(): boolean {
+    if (!this.started || !this.wsClient) return false;
+    try {
+      if (typeof (this.wsClient as any).getConnectionStatus === 'function') {
+        const status = (this.wsClient as any).getConnectionStatus();
+        return status?.state === 'connected' || status?.state === 'reconnecting';
+      }
+    } catch {}
     return this.started;
   }
 }

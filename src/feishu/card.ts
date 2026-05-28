@@ -336,23 +336,20 @@ export class FeishuCard {
         : `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
       elements.push({
         tag: 'action',
-        layout: 'bisected',
         actions: [
           {
             tag: 'button',
             text: { tag: 'plain_text', content: '⏹' },
-            type: 'danger',
-            size: 'small',
+            type: 'text',
+            size: 'tiny',
             value: { action: 'ctrl', op: 'abort' },
           },
-        ],
-      });
-      elements.push({
-        tag: 'note',
-        elements: [
           {
-            tag: 'plain_text',
-            content: `🕐 ${timeStr}`,
+            tag: 'button',
+            text: { tag: 'plain_text', content: `🕐 ${timeStr}` },
+            type: 'text',
+            size: 'tiny',
+            disabled: true,
           },
         ],
       });

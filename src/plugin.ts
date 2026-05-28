@@ -52,8 +52,9 @@ const FeishuPlugin: Plugin = {
         eventHandler = new OpenCodeEventHandler(sessionManager, feishuApi, undefined, undefined, config.showProcess, botName, config.thinkingLanguage);
 
         try {
-          // 使用宿主传入的 client 订阅事件
-          const events = await client.global.event({});
+          const events = client.event?.subscribe
+            ? await client.event.subscribe({})
+            : await client.global.event({});
           eventHandler.start(events).catch((err: any) => {
             log.error({ err }, 'Event stream error');
           });
