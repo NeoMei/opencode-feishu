@@ -477,6 +477,7 @@ describe('MessageHandler', () => {
       expect.stringContaining('Hello'),
       undefined,
       undefined,
+      undefined,
     );
   });
 
