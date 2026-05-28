@@ -172,6 +172,12 @@ export class OpenCodeEventHandler {
     const chatId = this.sessionManager.getChatIdBySession(properties.sessionID);
     if (!chatId) return;
 
+    // Record processing start time on first text delta
+    const session = this.sessionManager.getSession(chatId);
+    if (session && !session.processingStartTime) {
+      session.processingStartTime = Date.now();
+    }
+
     // Determine if we should show this field based on showProcess config
     const shouldShowField = this.shouldShowField(properties.field);
     if (!shouldShowField) {
@@ -329,6 +335,7 @@ export class OpenCodeEventHandler {
     session.tools = undefined;
     session.retryMessage = undefined;
     session.interactionReplied = undefined;
+    session.processingStartTime = undefined;
     this.sessionManager.updateStatus(chatId, 'idle');
     // Don't clear currentMessageId here — let MessageHandler clear it when a
     // new user message arrives. This prevents race conditions where AI sends
@@ -624,6 +631,7 @@ export class OpenCodeEventHandler {
     const thinkingContent = this.shouldShowThinking() ? (session.thinkingContent || '') : '';
     const tools = this.shouldShowTools() ? (session.tools || []) : [];
     const interaction = session.pendingInteraction;
+    const elapsedMs = session.processingStartTime ? Date.now() - session.processingStartTime : 0;
     log.info({ chatId, hasInteraction: !!interaction, interactionKind: interaction?.kind, targetMessageId, force: opts.force, done: opts.done, contentLen: content.length, contentPreview: JSON.stringify(content.substring(0, 200)) }, 'flushCard');
     const card = FeishuCard.createStreamingCard({
       content,
@@ -638,6 +646,7 @@ export class OpenCodeEventHandler {
       currentAgent: session.currentAgent,
       modelSelection: session.modelSelection,
       agentSelection: session.agentSelection,
+      elapsedMs,
     });
 
     if (!targetMessageId) {

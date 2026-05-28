@@ -82,8 +82,10 @@ export class FeishuCard {
       agents: Array<{ name: string; description?: string; mode?: string }>;
       currentAgent?: string;
     };
+    /** Elapsed processing time in milliseconds (for timer display) */
+    elapsedMs?: number;
   }): CardContent {
-    const { content, thinkingContent = '', tools = [], done = false, retry, showProcess = 'none', botName, interaction, currentModel, currentAgent, modelSelection, agentSelection } = opts;
+    const { content, thinkingContent = '', tools = [], done = false, retry, showProcess = 'none', botName, interaction, currentModel, currentAgent, modelSelection, agentSelection, elapsedMs = 0 } = opts;
 
     const showTools = showProcess === 'tools' || showProcess === 'full';
     const showThinking = showProcess === 'thinking' || showProcess === 'full';
@@ -145,29 +147,17 @@ export class FeishuCard {
         if (done) {
           parts.push(`<font color='grey'>💡 *思考过程：*</font>\n<font color='grey'>${normalize(trimmed)}</font>`);
         } else {
-          let t = `<font color='grey'>💭 ${normalize(trimmed)}</font>`;
-          if (isProcessing && !hasContent) t += ' <font color="grey">⏹</font>';
-          parts.push(t);
+          parts.push(`<font color='grey'>💭 ${normalize(trimmed)}</font>`);
         }
       }
 
       if (hasContent) {
-        let c = normalize(content.trim());
-        if (isProcessing) c += ' <font color="grey">⏹</font>';
-        parts.push(c);
+        parts.push(normalize(content.trim()));
       }
 
       elements.push({
         tag: 'div',
         text: { tag: 'lark_md', content: parts.join('\n') },
-      });
-    }
-
-    // Stop indicator: inline at end of content when processing (not a separate element)
-    if (isProcessing && !hasContent && !hasThinking) {
-      elements.push({
-        tag: 'div',
-        text: { tag: 'lark_md', content: '<font color="grey">⏹</font>' },
       });
     }
 
@@ -331,6 +321,41 @@ export class FeishuCard {
           if (idx < q.questions.length - 1) elements.push({ tag: 'hr' });
         }
       }
+    }
+
+    // Bottom action bar: stop button + elapsed timer for processing state
+    if (isProcessing && !interaction && !modelSelection && !agentSelection) {
+      elements.push({ tag: 'hr' });
+      // Format elapsed time as mm:ss or h:mm:ss
+      const totalSec = Math.floor(elapsedMs / 1000);
+      const sec = totalSec % 60;
+      const min = Math.floor(totalSec / 60) % 60;
+      const hr = Math.floor(totalSec / 3600);
+      const timeStr = hr > 0
+        ? `${hr}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+        : `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+      elements.push({
+        tag: 'action',
+        layout: 'bisected',
+        actions: [
+          {
+            tag: 'button',
+            text: { tag: 'plain_text', content: '⏹' },
+            type: 'danger',
+            size: 'small',
+            value: { action: 'ctrl', op: 'abort' },
+          },
+        ],
+      });
+      elements.push({
+        tag: 'note',
+        elements: [
+          {
+            tag: 'plain_text',
+            content: `🕐 ${timeStr}`,
+          },
+        ],
+      });
     }
 
     return {

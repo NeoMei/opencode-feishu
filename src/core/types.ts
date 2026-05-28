@@ -151,6 +151,8 @@ export interface SessionInfo {
     agents: Array<{ name: string; description?: string; mode?: string }>;
     currentAgent?: string;
   };
+  /** Timestamp when processing started (for elapsed time display) */
+  processingStartTime?: number;
 }
 
 /**
