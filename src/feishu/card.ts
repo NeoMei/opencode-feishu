@@ -336,6 +336,7 @@ export class FeishuCard {
         : `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
       elements.push({
         tag: 'action',
+        layout: 'flow',
         actions: [
           {
             tag: 'button',

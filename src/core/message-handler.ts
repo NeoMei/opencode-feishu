@@ -1511,6 +1511,10 @@ export class MessageHandler {
       const child = spawn('bash', [scriptPath, '19876'], {
         detached: true,
         stdio: 'ignore',
+        env: {
+          ...process.env,
+          FEISHU_NOTIFY_CHAT_ID: chatId,
+        },
       });
       child.unref();
 
