@@ -291,7 +291,7 @@ export class MessageHandler {
       // Handle admin restart commands - only exact slash commands
       const trimmedText = text.trim().toLowerCase();
       if (trimmedText === '/restart' || trimmedText === '/重启') {
-        await this.handleRestartCommand(chatId);
+        await this.handleRestartCommand(chatId, 'all');
         return;
       }
 
@@ -1101,8 +1101,8 @@ export class MessageHandler {
 
     // Handle /restart specially
     if (cmdName === 'restart') {
-      await this.handleRestartCommand(chatId);
-      return { toast: { type: 'success', content: '正在重启...' } };
+      await this.handleRestartCommand(chatId, 'all');
+      return { toast: { type: 'success', content: '正在重启全部服务...' } };
     }
 
     // Auto-create session if needed
@@ -1455,19 +1455,39 @@ export class MessageHandler {
 
   /**
    * Handle restart command from admin user.
-   * Simple implementation: send message and fire-and-forget the restart script.
+   * Supports: 'serve' (default), 'feishu', 'all'.
+   * Uses fire-and-forget detached spawn so the restart script can outlive this process.
    */
-  private async handleRestartCommand(chatId: string): Promise<void> {
+  private async handleRestartCommand(chatId: string, target: string = 'serve'): Promise<void> {
     const { execSync, spawn } = await import('child_process');
     const path = await import('path');
 
+    const targetLabels: Record<string, string> = {
+      serve: 'OpenCode 服务',
+      feishu: '飞书连接器',
+      all: '全部服务',
+    };
+    const label = targetLabels[target] || target;
+
+    // Map target to script name
+    const scriptNames: Record<string, string> = {
+      serve: 'restart-serve.sh',
+      feishu: 'restart-feishu.sh',
+      all: 'restart-all.sh',
+    };
+    const scriptName = scriptNames[target];
+    if (!scriptName) {
+      await this.feishuApi.sendText(chatId, `❌ 不支持的重启目标: ${target}`);
+      return;
+    }
+
     try {
-      await this.feishuApi.sendText(chatId, '🔄 正在重启 OpenCode 服务...');
+      await this.feishuApi.sendText(chatId, `🔄 正在重启 ${label}...`);
 
       // Find the restart script
       const possiblePaths = [
-        path.join(process.cwd(), 'connectors', 'feishu', 'restart-serve.sh'),
-        path.join(this.opencode.getDirectory(), 'connectors', 'feishu', 'restart-serve.sh'),
+        path.join(process.cwd(), 'connectors', 'feishu', scriptName),
+        path.join(this.opencode.getDirectory(), 'connectors', 'feishu', scriptName),
       ];
 
       let scriptPath = '';
@@ -1482,8 +1502,8 @@ export class MessageHandler {
       }
 
       if (!scriptPath) {
-        log.error('restart-serve.sh not found');
-        await this.feishuApi.sendText(chatId, '❌ 找不到重启脚本 connectors/feishu/restart-serve.sh');
+        log.error(`${scriptName} not found`);
+        await this.feishuApi.sendText(chatId, `❌ 找不到重启脚本 connectors/feishu/${scriptName}`);
         return;
       }
 
@@ -1494,9 +1514,9 @@ export class MessageHandler {
       });
       child.unref();
 
-      log.info({ scriptPath }, 'Restart script spawned');
+      log.info({ scriptPath, target }, 'Restart script spawned');
     } catch (err) {
-      log.error({ err }, 'Restart command failed');
+      log.error({ err, target }, 'Restart command failed');
       try {
         await this.feishuApi.sendText(chatId, `❌ 重启失败：${err instanceof Error ? err.message : String(err)}`);
       } catch { /* ignore */ }
