@@ -315,7 +315,12 @@ export class OpenCodeClient {
     }
 
     if (config.model || config.default_agent) {
-      const configPath = path.join(this.directory, '.opencode', 'config.json');
+      // 优先使用 opencode.json（新版本），回退到 config.json（旧版本）
+      const configDir = path.join(this.directory, '.opencode');
+      let configPath = path.join(configDir, 'opencode.json');
+      if (!fs.existsSync(configPath)) {
+        configPath = path.join(configDir, 'config.json');
+      }
       try {
         const existing = fs.existsSync(configPath)
           ? JSON.parse(fs.readFileSync(configPath, 'utf-8'))

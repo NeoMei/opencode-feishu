@@ -84,7 +84,12 @@ export class MessageHandler {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      const configPath = path.join(this.opencode.getDirectory(), '.opencode', 'config.json');
+      // 优先使用 opencode.json（新版本），回退到 config.json（旧版本）
+      const configDir = path.join(this.opencode.getDirectory(), '.opencode');
+      let configPath = path.join(configDir, 'opencode.json');
+      if (!fs.existsSync(configPath)) {
+        configPath = path.join(configDir, 'config.json');
+      }
       if (!fs.existsSync(configPath)) return;
       
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
