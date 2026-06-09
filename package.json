@@ -1,6 +1,6 @@
 {
   "name": "@neomei/opencode-feishu",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Node.js-native Feishu/Lark bridge for OpenCode — production-grade daemon, persistence, preflight, structured logs.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,7 +47,6 @@
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.63.1",
-    "@neomei/opencode-feishu": "^0.3.3",
     "@opencode-ai/sdk": "^1.0.0",
     "@types/qrcode": "^1.5.6",
     "commander": "^11.0.0",

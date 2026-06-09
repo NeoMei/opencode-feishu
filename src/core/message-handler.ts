@@ -775,7 +775,7 @@ export class MessageHandler {
       }
     })();
 
-    return { toast: { type: 'success', content: confirmText } };
+    return { toast: { type: 'success', content: confirmText }, card: confirmCard };
   }
 
   private async handleQuestionCardAction(
@@ -833,7 +833,7 @@ export class MessageHandler {
       }
     })();
 
-    return { toast: { type: 'success', content: `已提交选择：${label}` } };
+    return { toast: { type: 'success', content: `已提交选择：${label}` }, card: confirmCard };
   }
 
   private async handleNavigationCardAction(

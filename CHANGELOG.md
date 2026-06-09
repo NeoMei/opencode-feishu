@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] — 2026-06-10
+
+### Fixed
+
+- **修复授权卡片不更新的问题**: 用户点击飞书卡片的授权按钮后，回调响应中未携带 `card` 字段，导致原始卡片始终停留在"等待授权"状态，会话卡死。现在在 `handlePermissionCardAction` 和 `handleQuestionCardAction` 的返回值中同步附带 `card: confirmCard`，确保飞书立即更新卡片状态。
+
+- **移除自引用依赖**: `package.json` 的 `dependencies` 中错误地包含了 `"@neomei/opencode-feishu": "^0.3.3"`，导致 npm 在 `node_modules` 下创建嵌套包结构，造成混淆和重复安装。已删除该依赖。
+
 ## [0.4.0] — 2026-05-26
 
 ### Fixed
