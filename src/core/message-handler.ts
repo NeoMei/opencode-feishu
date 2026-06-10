@@ -7,6 +7,8 @@ import { MessageDeduplicator } from './dedup.js';
 import { FileDownloader } from './file-downloader.js';
 import { createLogger } from './logger.js';
 import { getWorkdirManager } from './workdir-manager.js';
+import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 
 const log = createLogger('MessageHandler');
 
@@ -1489,10 +1491,14 @@ export class MessageHandler {
     try {
       await this.feishuApi.sendText(chatId, `🔄 正在重启 ${label}...`);
 
-      // Find the restart script
+      const thisFile = fileURLToPath(import.meta.url);
+      const packageRoot = path.resolve(path.dirname(thisFile), '..', '..');
+
       const possiblePaths = [
         path.join(process.cwd(), 'connectors', 'feishu', scriptName),
         path.join(this.opencode.getDirectory(), 'connectors', 'feishu', scriptName),
+        path.join(packageRoot, 'connectors', 'feishu', scriptName),
+        path.join(homedir(), '.config', 'opencode', 'connectors', 'feishu', scriptName),
       ];
 
       let scriptPath = '';
