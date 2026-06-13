@@ -669,7 +669,7 @@ describe('EventHandler — permission race regression test', () => {
       undefined,
       'http://localhost:19876',
       'full',
-      '点点',
+      'TestBot',
     );
 
     // PHASE 1: Permission asked → card created with buttons
@@ -796,7 +796,7 @@ describe('EventHandler — permission race regression test', () => {
       undefined,
       'http://localhost:19876',
       'full',
-      '点点',
+      'TestBot',
     );
 
     // Text deltas should NOT be frozen for questions (only permission kind)

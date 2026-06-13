@@ -1,4 +1,4 @@
-import { ConfigManager, parseBotName } from './core/config.js';
+import { ConfigManager } from './core/config.js';
 import { SessionManager } from './core/session-manager.js';
 import { MessageHandler } from './core/message-handler.js';
 import { HookManager } from './core/hook-manager.js';
@@ -44,8 +44,8 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
     console.log(`📁 Workdir: ${currentWorkdir}`);
   }
 
-  // Resolve bot display name from soul/IDENTITY.md
-  const botName = parseBotName(process.cwd(), config.botName);
+  // Resolve bot display name from config or fallback
+  const botName = config.botName || 'opencode';
   console.log(`🤖 Bot name: ${botName}`);
 
   console.log('📋 Configuration:');

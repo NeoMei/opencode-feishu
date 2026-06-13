@@ -51,7 +51,7 @@ export interface FeishuConfig {
   autoApprove?: boolean;
   /**
    * Display name for the bot in card headers.
-   * Overrides auto-detection from soul/IDENTITY.md.
+   * Defaults to "opencode".
    */
   botName?: string;
 }

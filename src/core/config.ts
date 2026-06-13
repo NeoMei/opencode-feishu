@@ -26,7 +26,7 @@ const FeishuConfigSchema = z.object({
   autoApprove: z.boolean().default(true),
   workdir: z.string().optional(),
   thinkingLanguage: z.enum(['chinese', 'english']).default('chinese'),
-  /** Display name for the bot in card headers. Overrides auto-detection from soul/IDENTITY.md. */
+  /** Display name for the bot in card headers. Defaults to "opencode". */
   botName: z.string().optional(),
 });
 
@@ -122,25 +122,7 @@ export class ConfigManager {
   }
 }
 
-/**
- * Parse display name from project's soul/IDENTITY.md.
- * Priority: config.botName > projectDir/soul/IDENTITY.md > "opencode"
- */
-export function parseBotName(projectDir: string, configBotName?: string): string {
-  // 0. Explicit config override
-  if (configBotName) return configBotName;
 
-  // 1. Project-local soul config
-  const nameRegex = /\*\*Name:?\*{0,2}:?\s*(.+)/;
-  try {
-    const content = readFileSync(join(projectDir, 'soul', 'IDENTITY.md'), 'utf-8');
-    const match = content.match(nameRegex);
-    if (match?.[1]) return match[1].trim();
-  } catch {}
-
-  // 2. Default
-  return 'opencode';
-}
 
 export { FeishuConfigSchema };
 export type { FeishuConfig };

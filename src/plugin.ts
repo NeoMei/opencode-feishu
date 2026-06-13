@@ -1,5 +1,5 @@
 import type { Plugin, PluginInput } from './types/plugin.js';
-import { ConfigManager, parseBotName } from './core/config.js';
+import { ConfigManager } from './core/config.js';
 import { SessionManager } from './core/session-manager.js';
 import { MessageHandler } from './core/message-handler.js';
 import { FeishuAPI } from './feishu/api.js';
@@ -41,7 +41,7 @@ const FeishuPlugin: Plugin = {
         directory: directory || project?.root || process.cwd(),
       });
 
-      const botName = parseBotName(directory || project?.root || process.cwd(), config.botName);
+      const botName = config.botName || 'opencode';
 
       const sessionManager = new SessionManager(opencode);
       const messageHandler = new MessageHandler(config, sessionManager, feishuApi, opencode, botName);

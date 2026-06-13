@@ -20,7 +20,11 @@ const api = new FeishuAPI({
 
 const imService = new IMService(api);
 const CHAT_ID = process.env.FEISHU_NEWS_CHAT_ID || config.newsChatId;
-const ANYSEARCH_API_KEY = process.env.ANYSEARCH_API_KEY || 'as_sk_9ceeef3d98470f372a90d0c77e3687d5';
+const ANYSEARCH_API_KEY = process.env.ANYSEARCH_API_KEY;
+if (!ANYSEARCH_API_KEY) {
+  console.error('错误：未设置 ANYSEARCH_API_KEY 环境变量');
+  process.exit(1);
+}
 const ANYSEARCH_CLI = '/tmp/anysearch-skill-main/scripts/anysearch_cli.js';
 
 // 历史记录文件，用于去重

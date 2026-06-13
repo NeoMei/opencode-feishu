@@ -337,7 +337,7 @@ export class MessageHandler {
       this.sessionManager.updateStatus(chatId, 'busy');
 
       // Skip separate thinking card — the streaming card (created on first flushCard)
-      // already shows "💭 点点思考中..." as its header with no blank body.
+      // already shows "💭 Bot thinking..." as its header with no blank body.
 
       // Send message to OpenCode
       try {
