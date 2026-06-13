@@ -1491,8 +1491,15 @@ export class MessageHandler {
     try {
       await this.feishuApi.sendText(chatId, `🔄 正在重启 ${label}...`);
 
-      const thisFile = fileURLToPath(import.meta.url);
-      const packageRoot = path.resolve(path.dirname(thisFile), '..', '..');
+      const packageRoot = (() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-implied-eval
+          const metaUrl = (new Function('return import.meta.url'))();
+          return path.resolve(path.dirname(fileURLToPath(metaUrl)), '..', '..');
+        } catch {
+          return path.resolve(process.cwd());
+        }
+      })();
 
       const possiblePaths = [
         path.join(process.cwd(), 'connectors', 'feishu', scriptName),
