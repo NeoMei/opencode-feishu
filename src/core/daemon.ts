@@ -47,7 +47,7 @@ export function spawnDaemon(startArgs: string[]): void {
 
   // Resolve the script we're running: bin/opencode-feishu → dist/cli.js
   // When invoked via the bin wrapper, argv[1] is the cli.js path already.
-  const scriptPath = fileURLToPath(import.meta.url)
+  const scriptPath = process.argv[1];
     .replace(/[\\/]core[\\/]daemon\.js$/, `${sep}cli.js`);
 
   const child = spawn(

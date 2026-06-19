@@ -1512,7 +1512,7 @@ export class MessageHandler {
         try { unlinkSync(PID_FILE); } catch {}
 
         // Spawn new daemon (detached, survives parent exit)
-        const cliPath = fileURLToPath(import.meta.url)
+        const cliPath = (() => { try { return process.argv[1]; } catch { return join(process.cwd(), 'cli.js'); } })()
           .replace(/[\\/]core[\\/]message-handler\.js$/, `${sep}cli.js`);
         const feishuChild = spawn(process.execPath, [cliPath, 'start', '--daemon'], {
           detached: true,

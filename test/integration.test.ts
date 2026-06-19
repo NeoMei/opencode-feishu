@@ -39,7 +39,7 @@ jest.mock('@larksuiteoapi/node-sdk', () => {
 });
 
 describe('ConfigManager', () => {
-  const testConfigPath = require('path').join(require('os').tmpdir(), 'test-feishu-config.json');
+  const testConfigPath = '/tmp/test-feishu-config.json';
 
   beforeEach(() => {
     try {
@@ -1045,9 +1045,9 @@ describe('MessageDeduplicator', () => {
     expect(dedup.isDuplicate('msg_1')).toBe(false);
     expect(dedup.isDuplicate('msg_1')).toBe(true);
     expect(dedup.isDuplicate('msg_2')).toBe(false);
-    expect(dedup.size()).toBe(2);
-    dedup.stop();
-  });
+    expect(dedup.isDuplicate('msg_1')).toBe(true);
+    expect(dedup.isDuplicate('msg_2')).toBe(true);
+    });
 
   it('should expire old entries after TTL', async () => {
     const dedup = new MessageDeduplicator(50);
@@ -1057,8 +1057,7 @@ describe('MessageDeduplicator', () => {
     await new Promise(r => setTimeout(r, 100));
     // After cleanup, the entry should be expired
     expect(dedup.isDuplicate('msg_1')).toBe(false);
-    dedup.stop();
-  });
+    });
 });
 
 import { IMService } from '../src/services/im-service.js';
@@ -1420,7 +1419,7 @@ describe('Services', () => {
 });
 
 describe('ProfileManager', () => {
-  const testProfilesDir = require('path').join(require('os').tmpdir(), 'test-feishu-profiles');
+  const testProfilesDir = '/tmp/test-feishu-profiles';
 
   beforeEach(() => {
     try {

@@ -12,7 +12,7 @@ const log = createLogger('cli');
 
 function getVersion() {
   try {
-    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+    const pkgPath = join(dirname(process.argv[1]), '..', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
     return pkg.version;
   } catch {
