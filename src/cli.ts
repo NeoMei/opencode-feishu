@@ -2,7 +2,6 @@ import { Command } from 'commander';
 import { readFileSync, existsSync, unlinkSync, openSync, readSync, closeSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
 import { startStandalone } from './standalone.js';
 import { SetupWizard } from './setup/wizard.js';
 import { createLogger } from './core/logger.js';

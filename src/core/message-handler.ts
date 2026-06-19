@@ -9,7 +9,6 @@ import { createLogger } from './logger.js';
 import { getWorkdir } from './workdir-manager.js';
 import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { join, sep } from 'path';
-import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 
 const log = createLogger('MessageHandler');

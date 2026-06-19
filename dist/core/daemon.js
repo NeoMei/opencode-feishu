@@ -2,7 +2,6 @@ import { spawn } from 'child_process';
 import { existsSync, mkdirSync, openSync, writeFileSync, readFileSync, unlinkSync, statSync } from 'fs';
 import { dirname, join, sep } from 'path';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
 import { createLogger } from './logger.js';
 const log = createLogger('daemon');
 export const PID_FILE = join(homedir(), '.config', 'opencode', 'feishu.pid');
@@ -27,7 +26,7 @@ export function spawnDaemon(startArgs) {
     const logFd = openSync(logFile, 'a');
     // Resolve the script we're running: bin/opencode-feishu → dist/cli.js
     // When invoked via the bin wrapper, argv[1] is the cli.js path already.
-    const scriptPath = fileURLToPath(import.meta.url)
+    const scriptPath = process.argv[1]
         .replace(/[\\/]core[\\/]daemon\.js$/, `${sep}cli.js`);
     const child = spawn(process.execPath, [scriptPath, 'start', ...startArgs.filter(a => a !== '--daemon' && a !== '-d')], {
         detached: true,

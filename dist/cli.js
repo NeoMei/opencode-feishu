@@ -2,14 +2,14 @@ import { Command } from 'commander';
 import { readFileSync, existsSync, unlinkSync, openSync, readSync, closeSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
 import { startStandalone } from './standalone.js';
 import { SetupWizard } from './setup/wizard.js';
 import { createLogger } from './core/logger.js';
+import { ProfileManager } from './core/profile-manager.js';
 const log = createLogger('cli');
 function getVersion() {
     try {
-        const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+        const pkgPath = join(dirname(process.argv[1]), '..', 'package.json');
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
         return pkg.version;
     }
@@ -285,7 +285,6 @@ profile
     .description('List all profiles')
     .option('--json', 'Emit JSON output')
     .action(async (options) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     const profiles = mgr.list();
     if (options.json) {
@@ -308,7 +307,6 @@ profile
     .command('add <name>')
     .description('Add a new profile (copies current config)')
     .action(async (name) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const { ConfigManager } = await import('./core/config.js');
     const mgr = new ProfileManager();
     // Try to load current config
@@ -328,7 +326,6 @@ profile
     .command('use <name>')
     .description('Switch to a profile')
     .action(async (name) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     if (mgr.use(name)) {
         console.log(`✅ Now using profile "${name}"`);
@@ -342,7 +339,6 @@ profile
     .command('delete <name>')
     .description('Delete a profile')
     .action(async (name) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     if (mgr.delete(name)) {
         console.log(`✅ Profile "${name}" deleted`);
@@ -356,7 +352,6 @@ profile
     .command('rename <old> <new>')
     .description('Rename a profile')
     .action(async (oldName, newName) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     if (mgr.rename(oldName, newName)) {
         console.log(`✅ Profile "${oldName}" renamed to "${newName}"`);
@@ -370,7 +365,6 @@ profile
     .command('clone <source> <target>')
     .description('Clone a profile')
     .action(async (source, target) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     if (mgr.clone(source, target)) {
         console.log(`✅ Profile "${source}" cloned to "${target}"`);
@@ -385,7 +379,6 @@ profile
     .description('Show profile configuration')
     .option('--json', 'Emit JSON output')
     .action(async (name, options) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     const profileName = name || mgr.getActive()?.name;
     if (!profileName) {
