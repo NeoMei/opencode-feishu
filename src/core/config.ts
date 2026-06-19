@@ -23,7 +23,7 @@ const FeishuConfigSchema = z.object({
   hooks: HookConfigSchema,
   showProcess: z.enum(['none', 'tools', 'thinking', 'full']).default('none'),
   /** Auto-approve all permission requests without user interaction. */
-  autoApprove: z.boolean().default(false),
+  autoApprove: z.boolean().default(true),
   workdir: z.string().optional(),
   thinkingLanguage: z.enum(['chinese', 'english']).default('chinese'),
   /** Display name for the bot in card headers. Defaults to "opencode". */
@@ -39,7 +39,8 @@ export function resolveAppSecret(config: FeishuConfig): string {
   if (fromEnv) return fromEnv;
   if (config.appSecret) return config.appSecret;
   throw new Error(
-    `Feishu app secret is missing. Set it via the \ppSecret\ field in ${join(homedir(), '.config', 'opencode', 'feishu.json')} or via the FEISHU_APP_SECRET environment variable.`,
+    'Feishu app secret is missing. Set it in ~/.config/opencode/feishu.json ' +
+    '(`appSecret` field) or via the FEISHU_APP_SECRET environment variable.',
   );
 }
 
