@@ -117,25 +117,27 @@ export class OpenCodeServeManager {
       return;
     }
 
+    const proc = this.proc;
+    this.proc = null;
+
     log.info('Stopping opencode serve...');
 
-    // Try graceful shutdown first
-    this.proc.kill('SIGTERM');
+    // Try graceful shutdown first (no-op on Windows, where SIGTERM = forceful)
+    proc.kill('SIGTERM');
 
-    // Force kill after 5 seconds
+    // Force kill after 5 seconds (Unix fallback; Windows SIGTERM already forceful)
     const forceKillTimer = setTimeout(() => {
-      if (this.proc && !this.exited) {
+      if (!this.exited) {
         log.warn('Force killing opencode serve');
-        this.proc.kill('SIGKILL');
+        proc.kill('SIGKILL');
       }
     }, 5000);
 
-    this.proc.on('exit', () => {
+    proc.on('exit', () => {
       clearTimeout(forceKillTimer);
     });
-
-    this.proc = null;
   }
+
 
   /**
    * Check if opencode serve is currently running.

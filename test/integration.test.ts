@@ -39,7 +39,7 @@ jest.mock('@larksuiteoapi/node-sdk', () => {
 });
 
 describe('ConfigManager', () => {
-  const testConfigPath = '/tmp/test-feishu-config.json';
+  const testConfigPath = require('path').join(require('os').tmpdir(), 'test-feishu-config.json');
 
   beforeEach(() => {
     try {
@@ -1420,7 +1420,7 @@ describe('Services', () => {
 });
 
 describe('ProfileManager', () => {
-  const testProfilesDir = '/tmp/test-feishu-profiles';
+  const testProfilesDir = require('path').join(require('os').tmpdir(), 'test-feishu-profiles');
 
   beforeEach(() => {
     try {

@@ -7,8 +7,17 @@ import { requestAppRegistration, displayQRCode, pollAppRegistration } from './de
 
 const log = createLogger('SetupWizard');
 
+interface CommonOptions {
+  opencodeUrl: string;
+  streaming: boolean;
+  requireMention: boolean;
+  thinkingLanguage: 'chinese' | 'english';
+  allowlist: string;
+}
+
 export class SetupWizard {
   private configManager: ConfigManager;
+  private existingConfig?: FeishuConfig;
 
   constructor(configPath?: string) {
     this.configManager = new ConfigManager(configPath);
@@ -28,11 +37,10 @@ export class SetupWizard {
     console.log('   • 多配置管理：支持多个飞书应用配置\n');
 
     // If a config already exists, run preflight and let the user skip reconfiguring
-    // when everything is already green.
     if (this.configManager.exists()) {
-      const existing = this.configManager.load();
+      this.existingConfig = this.configManager.load();
       console.log('📋 检测到现有配置，正在运行 preflight 检查...\n');
-      const results = await preflight.runAll(existing, {
+      const results = await preflight.runAll(this.existingConfig, {
         configPath: this.configManager.getConfigPath(),
       });
       for (const r of results) {
@@ -52,17 +60,26 @@ export class SetupWizard {
         ]);
         if (!reconfigure) {
           console.log('保持现有配置。运行 `opencode-feishu start` 启动插件。\n');
-          return existing;
+          return this.existingConfig;
         }
       }
     }
 
-    // Default to scan mode for easiest setup
+    // Ask user which mode
+    const mode = await this.promptSetupMode();
+
     let config: FeishuConfig;
-    try {
-      config = await this.runScanSetup();
-    } catch (err) {
-      console.log('\n⚠️ 扫码创建应用失败或取消，切换到手动配置模式...\n');
+    if (mode === 'scan') {
+      try {
+        config = await this.runScanSetup();
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        log.warn({ err }, 'Scan setup failed');
+        console.log(`\n⚠️ 扫码创建应用失败：${reason}`);
+        console.log('   切换到手动配置模式...\n');
+        config = await this.runManualSetup();
+      }
+    } else {
       config = await this.runManualSetup();
     }
 
@@ -71,176 +88,64 @@ export class SetupWizard {
 
     console.log('\n✅ 配置已保存！');
     console.log(`📁 配置文件: ${this.configManager.getConfigPath()}`);
-    
-    // Print permission hints for advanced features
-    this.printPermissionHints();
-    
+
+    // Ask about advanced features
+    await this.promptAdvancedHints();
+
     console.log('\n🚀 启动插件:');
     console.log('   opencode-feishu start\n');
 
     return config;
   }
 
-  private async runScanSetup(): Promise<FeishuConfig> {
-    console.log('\n📱 扫码创建应用模式\n');
-    console.log('这将通过飞书扫码自动创建应用并获取凭证。\n');
-
-    try {
-      console.log('🔄 正在请求设备授权...');
-      const authResp = await requestAppRegistration();
-      
-      await displayQRCode(authResp.verificationUriComplete);
-
-      console.log('⏳ 等待扫码确认（有效期 ' + authResp.expiresIn + ' 秒）...');
-      const result = await pollAppRegistration(
-        authResp.deviceCode,
-        authResp.interval,
-        authResp.expiresIn,
-      );
-
-      console.log('\n✅ 应用创建成功！');
-      console.log(`   App ID: ${result.clientID}`);
-      console.log(`   App Secret: ${result.clientSecret.substring(0, 10)}...`);
-      
-      if (result.userInfo) {
-        console.log(`   租户: ${result.userInfo.tenantBrand}`);
-      }
-
-      // Configure remaining options
-      const { opencodeUrl, streaming, requireMention, thinkingLanguage } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'opencodeUrl',
-          message: 'OpenCode 服务器地址 (默认本地，需先运行 opencode serve --port 19876):',
-          default: 'http://localhost:19876',
-          validate: (input: string) => {
-            try {
-              new URL(input);
-              return true;
-            } catch {
-              return '请输入有效的 URL';
-            }
-          },
-        },
-        {
-          type: 'confirm',
-          name: 'streaming',
-          message: '启用流式输出？',
-          default: true,
-        },
-        {
-          type: 'confirm',
-          name: 'requireMention',
-          message: '群聊中需要 @机器人才回复？',
-          default: true,
-        },
-        {
-          type: 'list',
-          name: 'thinkingLanguage',
-          message: 'AI 思考过程显示语言：',
-          choices: [
-            { name: '简体中文（强制中文思考）', value: 'chinese' },
-            { name: '英文（保持原始英文思考）', value: 'english' },
-          ],
-          default: 'chinese',
-        },
-      ]);
-
-      console.log('\n📋 应用已创建，请前往飞书开放平台完成后续配置：');
-      console.log('   1. 开启「机器人」能力');
-      console.log('   2. 添加权限：im:message, im:message:send_as_bot 等');
-      console.log('   3. 配置事件订阅：使用长连接，添加 im.message.receive_v1');
-      console.log('   4. 发布应用\n');
-
-      await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'confirm',
-          message: '完成上述步骤后按 Enter 继续...',
-        },
-      ]);
-
-      return {
-        appId: result.clientID,
-        appSecret: result.clientSecret,
-        domain: result.userInfo?.tenantBrand === 'lark' ? 'lark' : 'feishu',
-        opencodeUrl,
-        streaming,
-        requireMention,
-        thinkingLanguage,
-        groupPolicy: 'allowlist',
-        allowlist: [],
-      };
-    } catch (err) {
-      log.error({ err }, 'Scan setup failed');
-      console.error('\n❌ 扫码创建应用失败:', err instanceof Error ? err.message : String(err));
-      console.log('\n💡 你可以尝试手动配置：');
-      console.log('   1. 访问 https://open.feishu.cn/app');
-      console.log('   2. 创建企业自建应用');
-      console.log('   3. 获取 App ID 和 App Secret\n');
-      
-      // Throw to let caller handle fallback
-      throw err;
-    }
-  }
-
-  private async runManualSetup(): Promise<FeishuConfig> {
-    console.log('\n📝 手动配置模式\n');
-
-    const answers = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'appId',
-        message: '请输入飞书 App ID (格式: cli_xxx，在「凭证与基础信息」页面获取):',
-        validate: (input: string) => {
-          if (!input.startsWith('cli_')) {
-            return 'App ID 应以 cli_ 开头';
-          }
-          return true;
-        },
-      },
-      {
-        type: 'password',
-        name: 'appSecret',
-        message: '请输入飞书 App Secret (在同一页面的「App Secret」字段，点击「查看」获取):',
-        mask: '*',
-        validate: (input: string) => input.length >= 10 || 'App Secret 格式不正确',
-      },
+  /** Ask whether to use scan or manual mode. */
+  private async promptSetupMode(): Promise<'scan' | 'manual'> {
+    const { mode } = await inquirer.prompt([
       {
         type: 'list',
-        name: 'domain',
-        message: '选择域名：',
+        name: 'mode',
+        message: '选择配置方式：',
         choices: [
-          { name: '飞书 (open.feishu.cn)', value: 'feishu' },
-          { name: 'Lark (open.larksuite.com)', value: 'lark' },
+          { name: '📱 扫码创建应用（推荐，自动获取凭证）', value: 'scan' },
+          { name: '📝 手动输入 App ID / App Secret', value: 'manual' },
         ],
-        default: 'feishu',
+        default: 'scan',
       },
+    ]);
+    return mode;
+  }
+
+  /**
+   * Shared prompt for common options used by both scan and manual setup.
+   * Falls back to existing config values when reconfiguring.
+   */
+  private async promptCommonOptions(defaults?: Partial<CommonOptions>): Promise<CommonOptions> {
+    return inquirer.prompt([
       {
         type: 'input',
         name: 'opencodeUrl',
         message: 'OpenCode 服务器地址 (默认本地，需先运行 opencode serve --port 19876):',
-        default: 'http://localhost:19876',
+        default: defaults?.opencodeUrl || this.existingConfig?.opencodeUrl || 'http://localhost:19876',
         validate: (input: string) => {
-          try {
-            new URL(input);
-            return true;
-          } catch {
-            return '请输入有效的 URL';
-          }
+          try { new URL(input); return true; }
+          catch { return '请输入有效的 URL'; }
         },
       },
       {
         type: 'confirm',
         name: 'streaming',
         message: '启用流式输出？',
-        default: true,
+        default: defaults?.streaming !== undefined
+          ? defaults.streaming
+          : (this.existingConfig?.streaming !== undefined ? this.existingConfig.streaming : true),
       },
       {
         type: 'confirm',
         name: 'requireMention',
         message: '群聊中需要 @机器人才回复？',
-        default: true,
+        default: defaults?.requireMention !== undefined
+          ? defaults.requireMention
+          : (this.existingConfig?.requireMention !== undefined ? this.existingConfig.requireMention : true),
       },
       {
         type: 'list',
@@ -250,35 +155,164 @@ export class SetupWizard {
           { name: '简体中文（强制中文思考）', value: 'chinese' },
           { name: '英文（保持原始英文思考）', value: 'english' },
         ],
-        default: 'chinese',
+        default: defaults?.thinkingLanguage || this.existingConfig?.thinkingLanguage || 'chinese',
+      },
+      {
+        type: 'input',
+        name: 'allowlist',
+        message: '用户白名单（union_id，逗号分隔，留空表示不限制）:',
+        default: defaults?.allowlist
+          || (this.existingConfig?.allowlist?.length ? this.existingConfig.allowlist.join(', ') : ''),
       },
     ]);
+  }
 
+  private async runScanSetup(): Promise<FeishuConfig> {
+    console.log('\n📱 扫码创建应用模式\n');
+    console.log('这将通过飞书扫码自动创建应用并获取凭证。\n');
+
+    console.log('🔄 正在请求设备授权...');
+    const authResp = await requestAppRegistration();
+
+    await displayQRCode(authResp.verificationUriComplete);
+
+    console.log('⏳ 等待扫码确认（有效期 ' + authResp.expiresIn + ' 秒）...');
+    const result = await pollAppRegistration(
+      authResp.deviceCode,
+      authResp.interval,
+      authResp.expiresIn,
+    );
+
+    console.log('\n✅ 应用创建成功！');
+    console.log(`   App ID: ${result.clientID}`);
+    console.log('   App Secret: **** (已保存)');
+
+    if (result.userInfo) {
+      console.log(`   租户: ${result.userInfo.tenantBrand}`);
+    }
+
+    // Verify the new credentials actually work before proceeding
     console.log('\n🧪 验证凭证...');
     const isValid = await this.verifyFeishuCredentials(
-      answers.appId,
-      answers.appSecret,
-      answers.domain,
+      result.clientID,
+      result.clientSecret,
+      'feishu',
     );
 
     if (!isValid) {
-      console.log('\n❌ 验证失败：请检查 App ID / App Secret 是否正确、应用是否已发布。');
-      throw new Error('Feishu credentials check failed');
+      console.log('\n⚠️ 应用已创建但凭证验证未通过。');
+      console.log('   请前往飞书开放平台确认：');
+      console.log('   1. 已开启「机器人」能力');
+      console.log('   2. 应用已发布');
+      console.log('   3. 稍后运行 `opencode-feishu doctor` 检查状态\n');
+    } else {
+      console.log('✅ 凭证验证通过\n');
     }
 
-    console.log('✅ 验证通过！\n');
+    const common = await this.promptCommonOptions();
 
     return {
-      appId: answers.appId,
-      appSecret: answers.appSecret,
-      domain: answers.domain,
-      opencodeUrl: answers.opencodeUrl,
-      streaming: answers.streaming,
-      requireMention: answers.requireMention,
-      thinkingLanguage: answers.thinkingLanguage,
+      appId: result.clientID,
+      appSecret: result.clientSecret,
+      domain: 'feishu',
+      opencodeUrl: common.opencodeUrl,
+      streaming: common.streaming,
+      requireMention: common.requireMention,
+      thinkingLanguage: common.thinkingLanguage,
       groupPolicy: 'allowlist',
-      allowlist: [],
+      allowlist: common.allowlist ? common.allowlist.split(/[,，\s]+/).filter(Boolean) : [],
     };
+  }
+
+  private async runManualSetup(): Promise<FeishuConfig> {
+    console.log('\n📝 手动配置模式\n');
+
+    // Loop until credentials are verified or user gives up
+    while (true) {
+      const answers = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'appId',
+          message: '请输入飞书 App ID (格式: cli_xxx，在「凭证与基础信息」页面获取):',
+          default: this.existingConfig?.appId,
+          validate: (input: string) => {
+            if (!input.startsWith('cli_')) return 'App ID 应以 cli_ 开头';
+            return true;
+          },
+        },
+        {
+          type: 'password',
+          name: 'appSecret',
+          message: '请输入飞书 App Secret (在同一页面的「App Secret」字段，点击「查看」获取):',
+          mask: '*',
+          validate: (input: string) => input.length >= 10 || 'App Secret 格式不正确',
+        },
+        {
+          type: 'list',
+          name: 'domain',
+          message: '选择域名：',
+          choices: [
+            { name: '飞书 (open.feishu.cn)', value: 'feishu' },
+            { name: 'Lark (open.larksuite.com)', value: 'lark' },
+          ],
+          default: this.existingConfig?.domain || 'feishu',
+        },
+      ]);
+
+      console.log('\n🧪 验证凭证...');
+      const isValid = await this.verifyFeishuCredentials(
+        answers.appId,
+        answers.appSecret,
+        answers.domain,
+      );
+
+      if (isValid) {
+        console.log('✅ 验证通过！\n');
+
+        const common = await this.promptCommonOptions();
+
+        return {
+          appId: answers.appId,
+          appSecret: answers.appSecret,
+          domain: answers.domain,
+          opencodeUrl: common.opencodeUrl,
+          streaming: common.streaming,
+          requireMention: common.requireMention,
+          thinkingLanguage: common.thinkingLanguage,
+          groupPolicy: 'allowlist',
+          allowlist: common.allowlist ? common.allowlist.split(/[,，\s]+/).filter(Boolean) : [],
+        };
+      }
+
+      console.log('\n❌ 验证失败：请检查 App ID / App Secret 是否正确、应用是否已发布。');
+
+      const { retry } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'retry',
+          message: '是否重试？',
+          default: true,
+        },
+      ]);
+
+      if (!retry) {
+        throw new Error('Feishu credentials check failed — user chose not to retry');
+      }
+      console.log();
+    }
+  }
+
+  /** Ask whether to show advanced permission hints, and display if yes. */
+  private async promptAdvancedHints(): Promise<void> {
+    const { show } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'show',
+        message: '是否需要文档/日历/任务/审批等高级功能权限配置指引？',
+        default: false,
+      },
+    ]);
+    if (show) this.printPermissionHints();
   }
 
   /** Print permission hints for document and other advanced features. */
@@ -298,7 +332,6 @@ export class SetupWizard {
     console.log('\n💡 添加路径：飞书开放平台 → 权限管理 → 搜索并添加\n');
   }
 
-  /** Shared preflight check — confirms the app is published, secret is right, bot ability is on. */
   private async verifyFeishuCredentials(
     appId: string,
     appSecret: string,

@@ -45,13 +45,6 @@ export class MessageDeduplicator {
   }
 
   /**
-   * Get the current size of the dedup cache.
-   */
-  size(): number {
-    return this.seen.size;
-  }
-
-  /**
    * Clean up expired entries.
    */
   private cleanup(): void {
@@ -66,16 +59,5 @@ export class MessageDeduplicator {
     if (cleaned > 0) {
       log.debug({ cleaned, remaining: this.seen.size }, 'Dedup cache cleaned');
     }
-  }
-
-  /**
-   * Stop the cleanup interval.
-   */
-  stop(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = undefined;
-    }
-    this.seen.clear();
   }
 }

@@ -42,20 +42,6 @@ export class OpenCodeEventHandler {
     this.opencode = opencode;
   }
 
-  /**
-   * Check if thinking content should be shown based on showProcess config.
-   */
-  private shouldShowThinking(): boolean {
-    return this.showProcess === 'thinking' || this.showProcess === 'full';
-  }
-
-  /**
-   * Check if tools should be shown based on showProcess config.
-   */
-  private shouldShowTools(): boolean {
-    return this.showProcess === 'tools' || this.showProcess === 'full';
-  }
-
   async start(eventStream: { stream: AsyncGenerator<any, void, unknown> }): Promise<void> {
     if (this.isRunning) {
       log.warn('Already running');
@@ -210,7 +196,7 @@ export class OpenCodeEventHandler {
     part: any;
   }): Promise<void> {
     // Skip tool display if not showing tools
-    if (!this.shouldShowTools()) return;
+    if (!(this.showProcess === 'tools' || this.showProcess === 'full')) return;
 
     const { part } = properties;
     if (part?.type !== 'tool') return;
@@ -628,8 +614,8 @@ export class OpenCodeEventHandler {
     // don't race against each other and update different messages.
     const targetMessageId = session.currentMessageId;
     const content = session.currentContent || '';
-    const thinkingContent = this.shouldShowThinking() ? (session.thinkingContent || '') : '';
-    const tools = this.shouldShowTools() ? (session.tools || []) : [];
+    const thinkingContent = (this.showProcess === 'thinking' || this.showProcess === 'full') ? (session.thinkingContent || '') : '';
+    const tools = (this.showProcess === 'tools' || this.showProcess === 'full') ? (session.tools || []) : [];
     const interaction = session.pendingInteraction;
     const elapsedMs = session.processingStartTime ? Date.now() - session.processingStartTime : 0;
     log.info({ chatId, hasInteraction: !!interaction, interactionKind: interaction?.kind, targetMessageId, force: opts.force, done: opts.done, contentLen: content.length, contentPreview: JSON.stringify(content.substring(0, 200)) }, 'flushCard');

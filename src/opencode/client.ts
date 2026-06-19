@@ -26,19 +26,7 @@ export class OpenCodeClient {
     this.client = createOpencodeClient(config);
   }
 
-  private formatError(error: unknown): string {
-    if (typeof error === 'string') return error;
-    if (error instanceof Error) return error.message;
-    try {
-      // Try to stringify with all own property names (including non-enumerable)
-      const props = error && typeof error === 'object'
-        ? Object.getOwnPropertyNames(error)
-        : undefined;
-      return JSON.stringify(error, props);
-    } catch {
-      return String(error);
-    }
-  }
+  private formatError(error: unknown): string { return String(error instanceof Error ? error.message : error); }
 
   async createSession(title?: string): Promise<any> {
     const { data, error } = await this.client.session.create({

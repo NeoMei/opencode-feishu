@@ -46,7 +46,9 @@ export async function checkConfigWritable(configPath = DEFAULT_CONFIG_PATH): Pro
       ok: false,
       label: 'Config directory writable',
       detail: `Cannot write to ${dir}`,
-      fix: `Check permissions or run: mkdir -p ${dir} && chmod u+w ${dir}`,
+      fix: process.platform === 'win32'
+        ? `Cannot write to ${dir}. Check folder permissions.`
+        : `Check permissions or run: mkdir -p ${dir} && chmod u+w ${dir}`,
     };
   }
 }
@@ -204,8 +206,6 @@ export async function checkPermissions(
   appSecret: string | undefined,
   domain: 'feishu' | 'lark' = 'feishu',
 ): Promise<CheckResult[]> {
-  const results: CheckResult[] = [];
-  
   if (!appId || !appSecret) {
     return [{
       ok: false,
@@ -215,6 +215,7 @@ export async function checkPermissions(
     }];
   }
 
+  const results: CheckResult[] = [];
   try {
     const client = new Lark.Client({
       appId,
@@ -223,186 +224,33 @@ export async function checkPermissions(
       logger: silentLogger,
     });
 
-    // Check IM permissions
-    try {
-      const imRes: any = await client.request({
-        method: 'GET',
-        url: '/open-apis/im/v1/messages',
-        params: { container_id_type: 'chat', container_id: 'test', page_size: 1 },
-      });
-      results.push({
-        ok: imRes.code === 0 || imRes.code === 10002, // 10002 = invalid chat_id, which means permission is OK
-        label: 'IM permission (im:message)',
-        detail: imRes.code === 0 || imRes.code === 10002 ? 'Granted' : `Denied: ${imRes.msg}`,
-        fix: imRes.code !== 0 && imRes.code !== 10002 ? 'Enable "im:message" scope in Feishu console' : undefined,
-      });
-    } catch (err: any) {
-      if (isPermissionDenied(err)) {
+    const checks = [
+      { label: 'IM permission (im:message)',          scope: 'im:message',          url: '/open-apis/im/v1/messages',           params: { container_id_type: 'chat', container_id: 'test', page_size: 1 }, okCodes: [0, 10002] },
+      { label: 'Contact permission (contact:user)',    scope: 'contact:user',        url: '/open-apis/contact/v3/users',          params: { user_id_type: 'open_id', page_size: 1 }, okCodes: [0, 10002] },
+      { label: 'Calendar permission (calendar:calendar)', scope: 'calendar:calendar', url: '/open-apis/calendar/v4/calendars',      params: { page_size: 1 }, okCodes: [0, 10002] },
+      { label: 'Task permission (task:task)',          scope: 'task:task',           url: '/open-apis/task/v2/tasks',             params: { page_size: 1 }, okCodes: [0, 10002] },
+      { label: 'Approval permission (approval:instance)', scope: 'approval:instance', url: '/open-apis/approval/v4/instances',     params: { page_size: 1 }, okCodes: [0, 10002] },
+      { label: 'Doc permission (docx:document)',       scope: 'docx:document',       url: '/open-apis/doc/v2/meta',               params: { doc_token: 'test' }, okCodes: [0, 10002, 10003] },
+    ];
+
+    for (const c of checks) {
+      try {
+        const res: any = await client.request({ method: 'GET', url: c.url, params: c.params });
+        const ok = c.okCodes.includes(res.code);
         results.push({
-          ok: false,
-          label: 'IM permission (im:message)',
-          detail: `Denied: ${err.message}`,
-          fix: 'Enable "im:message" scope in Feishu console',
+          ok,
+          label: c.label,
+          detail: ok ? 'Granted' : `Denied: ${res.msg}`,
+          fix: ok ? undefined : `Enable "${c.scope}" scope in Feishu console`,
         });
-      } else {
-        results.push({
-          ok: true,
-          label: 'IM permission (im:message)',
-          detail: 'Granted (API reachable)',
-        });
+      } catch (err: any) {
+        if (isPermissionDenied(err)) {
+          results.push({ ok: false, label: c.label, detail: `Denied: ${err.message}`, fix: `Enable "${c.scope}" scope in Feishu console` });
+        } else {
+          results.push({ ok: true, label: c.label, detail: 'Granted (API reachable)' });
+        }
       }
     }
-
-    // Check contact permissions
-    try {
-      const contactRes: any = await client.request({
-        method: 'GET',
-        url: '/open-apis/contact/v3/users',
-        params: { user_id_type: 'open_id', page_size: 1 },
-      });
-      results.push({
-        ok: contactRes.code === 0 || contactRes.code === 10002,
-        label: 'Contact permission (contact:user)',
-        detail: contactRes.code === 0 || contactRes.code === 10002 ? 'Granted' : `Denied: ${contactRes.msg}`,
-        fix: contactRes.code !== 0 && contactRes.code !== 10002 ? 'Enable "contact:user" scope in Feishu console' : undefined,
-      });
-    } catch (err: any) {
-      if (isPermissionDenied(err)) {
-        results.push({
-          ok: false,
-          label: 'Contact permission (contact:user)',
-          detail: `Denied: ${err.message}`,
-          fix: 'Enable "contact:user" scope in Feishu console',
-        });
-      } else {
-        results.push({
-          ok: true,
-          label: 'Contact permission (contact:user)',
-          detail: 'Granted (API reachable)',
-        });
-      }
-    }
-
-    // Check calendar permissions
-    try {
-      const calRes: any = await client.request({
-        method: 'GET',
-        url: '/open-apis/calendar/v4/calendars',
-        params: { page_size: 1 },
-      });
-      results.push({
-        ok: calRes.code === 0 || calRes.code === 10002,
-        label: 'Calendar permission (calendar:calendar)',
-        detail: calRes.code === 0 || calRes.code === 10002 ? 'Granted' : `Denied: ${calRes.msg}`,
-        fix: calRes.code !== 0 && calRes.code !== 10002 ? 'Enable "calendar:calendar" scope in Feishu console' : undefined,
-      });
-    } catch (err: any) {
-      if (isPermissionDenied(err)) {
-        results.push({
-          ok: false,
-          label: 'Calendar permission (calendar:calendar)',
-          detail: `Denied: ${err.message}`,
-          fix: 'Enable "calendar:calendar" scope in Feishu console',
-        });
-      } else {
-        results.push({
-          ok: true,
-          label: 'Calendar permission (calendar:calendar)',
-          detail: 'Granted (API reachable)',
-        });
-      }
-    }
-
-    // Check task permissions
-    try {
-      const taskRes: any = await client.request({
-        method: 'GET',
-        url: '/open-apis/task/v2/tasks',
-        params: { page_size: 1 },
-      });
-      results.push({
-        ok: taskRes.code === 0 || taskRes.code === 10002,
-        label: 'Task permission (task:task)',
-        detail: taskRes.code === 0 || taskRes.code === 10002 ? 'Granted' : `Denied: ${taskRes.msg}`,
-        fix: taskRes.code !== 0 && taskRes.code !== 10002 ? 'Enable "task:task" scope in Feishu console' : undefined,
-      });
-    } catch (err: any) {
-      if (isPermissionDenied(err)) {
-        results.push({
-          ok: false,
-          label: 'Task permission (task:task)',
-          detail: `Denied: ${err.message}`,
-          fix: 'Enable "task:task" scope in Feishu console',
-        });
-      } else {
-        results.push({
-          ok: true,
-          label: 'Task permission (task:task)',
-          detail: 'Granted (API reachable)',
-        });
-      }
-    }
-
-    // Check approval permissions
-    try {
-      const approvalRes: any = await client.request({
-        method: 'GET',
-        url: '/open-apis/approval/v4/instances',
-        params: { page_size: 1 },
-      });
-      results.push({
-        ok: approvalRes.code === 0 || approvalRes.code === 10002,
-        label: 'Approval permission (approval:instance)',
-        detail: approvalRes.code === 0 || approvalRes.code === 10002 ? 'Granted' : `Denied: ${approvalRes.msg}`,
-        fix: approvalRes.code !== 0 && approvalRes.code !== 10002 ? 'Enable "approval:instance" scope in Feishu console' : undefined,
-      });
-    } catch (err: any) {
-      if (isPermissionDenied(err)) {
-        results.push({
-          ok: false,
-          label: 'Approval permission (approval:instance)',
-          detail: `Denied: ${err.message}`,
-          fix: 'Enable "approval:instance" scope in Feishu console',
-        });
-      } else {
-        results.push({
-          ok: true,
-          label: 'Approval permission (approval:instance)',
-          detail: 'Granted (API reachable)',
-        });
-      }
-    }
-
-    // Check doc permissions
-    try {
-      const docRes: any = await client.request({
-        method: 'GET',
-        url: '/open-apis/doc/v2/meta',
-        params: { doc_token: 'test' },
-      });
-      results.push({
-        ok: docRes.code === 0 || docRes.code === 10002 || docRes.code === 10003,
-        label: 'Doc permission (docx:document)',
-        detail: docRes.code === 0 || docRes.code === 10002 || docRes.code === 10003 ? 'Granted' : `Denied: ${docRes.msg}`,
-        fix: docRes.code !== 0 && docRes.code !== 10002 && docRes.code !== 10003 ? 'Enable "docx:document" scope in Feishu console' : undefined,
-      });
-    } catch (err: any) {
-      if (isPermissionDenied(err)) {
-        results.push({
-          ok: false,
-          label: 'Doc permission (docx:document)',
-          detail: `Denied: ${err.message}`,
-          fix: 'Enable "docx:document" scope in Feishu console',
-        });
-      } else {
-        results.push({
-          ok: true,
-          label: 'Doc permission (docx:document)',
-          detail: 'Granted (API reachable)',
-        });
-      }
-    }
-
   } catch (err: any) {
     results.push({
       ok: false,
@@ -414,6 +262,7 @@ export async function checkPermissions(
 
   return results;
 }
+
 
 /**
  * Run all applicable checks given a (possibly partial) config.

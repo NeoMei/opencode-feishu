@@ -74,6 +74,15 @@ export async function requestAppRegistration(): Promise<AppRegistrationResponse>
  */
 export async function displayQRCode(url: string): Promise<void> {
   try {
+    // Pre-check: legacy Windows CMD may not render QR codes well
+    const isLegacyTerminal = process.platform === 'win32' && !process.env.WT_SESSION && !process.env.TERM;
+    if (isLegacyTerminal) {
+      console.log('\n📱 请使用飞书 App 扫描以下二维码，或访问链接创建应用：');
+      console.log('   ' + url);
+      console.log('⏳ 等待扫码确认...\n');
+      return;
+    }
+
     const qr = await qrcode.toString(url, { 
       type: 'terminal',
       small: true,

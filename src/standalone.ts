@@ -9,7 +9,7 @@ import { OpenCodeClient } from './opencode/client.js';
 import { OpenCodeEventHandler } from './opencode/event-handler.js';
 import { createLogger } from './core/logger.js';
 import { startStatusWriter } from './core/daemon.js';
-import { initWorkdirManager } from './core/workdir-manager.js';
+import { initWorkdirManager, getWorkdir } from './core/workdir-manager.js';
 import { OpenCodeServeManager, isOpencodeServerRunning } from './core/opencode-serve-manager.js';
 
 const log = createLogger('standalone');
@@ -38,8 +38,8 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
   const config = configManager.load();
 
   // Initialize workdir manager (persistent working directory for bash commands)
-  const workdirManager = initWorkdirManager(config.workdir);
-  const currentWorkdir = workdirManager.get();
+  initWorkdirManager(config.workdir);
+  const currentWorkdir = getWorkdir();
   if (currentWorkdir) {
     console.log(`📁 Workdir: ${currentWorkdir}`);
   }
@@ -252,22 +252,20 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
         if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
           log.error('Max consecutive failures reached, restarting opencode serve...');
           try {
-            // Kill existing process (excluding current process)
-            const { execSync } = await import('child_process');
-            const currentPid = process.pid;
-            try {
-              execSync(`pgrep -f "opencode serve" | grep -v "${currentPid}" | xargs -r kill 2>/dev/null || true`, { 
-                stdio: 'ignore' 
+            // Stop the existing serve manager if we started it
+            if (serveManager) {
+              serveManager.stop();
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              await serveManager.start();
+            } else {
+              // Fallback: spawn a new opencode serve process
+              const { spawn } = await import('child_process');
+              const child = spawn('opencode', ['serve', '--port', String(opencodePort)], {
+                detached: true,
+                stdio: 'ignore',
               });
-            } catch {
-              // Ignore errors from pgrep/kill
+              child.unref();
             }
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Restart opencode serve
-            execSync('nohup opencode serve --port 19876 > /tmp/opencode-serve.log 2>&1 &', {
-              stdio: 'ignore'
-            });
             
             // Wait for it to be ready
             let retries = 10;

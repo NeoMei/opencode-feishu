@@ -7,7 +7,7 @@ import { FeishuEventSource } from './feishu/event-source.js';
 import { OpenCodeClient } from './opencode/client.js';
 import { OpenCodeEventHandler } from './opencode/event-handler.js';
 import { createLogger } from './core/logger.js';
-import { initWorkdirManager } from './core/workdir-manager.js';
+import { initWorkdirManager, getWorkdir } from './core/workdir-manager.js';
 
 const log = createLogger('plugin');
 
@@ -27,8 +27,7 @@ const FeishuPlugin: Plugin = {
 
       // Initialize workdir manager (persistent working directory for bash commands)
       initWorkdirManager(config.workdir);
-      const workdirManager = (await import('./core/workdir-manager.js')).getWorkdirManager();
-      const currentWorkdir = workdirManager.get();
+      const currentWorkdir = getWorkdir();
       if (currentWorkdir) {
         log.info({ workdir: currentWorkdir }, 'Workdir initialized');
       }

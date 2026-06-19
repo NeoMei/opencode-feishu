@@ -6,7 +6,9 @@ import { FeishuCard } from '../feishu/card.js';
 import { MessageDeduplicator } from './dedup.js';
 import { FileDownloader } from './file-downloader.js';
 import { createLogger } from './logger.js';
-import { getWorkdirManager } from './workdir-manager.js';
+import { getWorkdir } from './workdir-manager.js';
+import { existsSync, readFileSync, unlinkSync } from 'fs';
+import { join, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 
@@ -84,17 +86,15 @@ export class MessageHandler {
 
   private async syncModelOverride(chatId: string): Promise<void> {
     try {
-      const fs = await import('fs');
-      const path = await import('path');
       // 优先使用 opencode.json（新版本），回退到 config.json（旧版本）
-      const configDir = path.join(this.opencode.getDirectory(), '.opencode');
-      let configPath = path.join(configDir, 'opencode.json');
-      if (!fs.existsSync(configPath)) {
-        configPath = path.join(configDir, 'config.json');
+      const configDir = join(this.opencode.getDirectory(), '.opencode');
+      let configPath = join(configDir, 'opencode.json');
+      if (!existsSync(configPath)) {
+        configPath = join(configDir, 'config.json');
       }
-      if (!fs.existsSync(configPath)) return;
+      if (!existsSync(configPath)) return;
       
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      const config = JSON.parse(readFileSync(configPath, 'utf-8'));
       const currentModel = config?.model as string | undefined;
       if (!currentModel) return;
 
@@ -271,7 +271,7 @@ export class MessageHandler {
         }
         log.info({ text: text.substring(0, 100), type: message.message_type, files: files.length }, 'Extracted content');
       } catch {
-        log.warn({ content: message.content, type: message.message_type }, 'Failed to parse message content');
+        log.warn({ type: message.message_type }, 'Failed to parse message content');
         text = `[不支持的消息类型: ${message.message_type}]`;
       }
 
@@ -401,8 +401,7 @@ export class MessageHandler {
         } else {
           log.info({ sessionId: session.id, files: files.length }, 'Sending prompt to OpenCode');
           // Inject chat context so the AI knows the current chat_id for Feishu operations
-          const workdirManager = getWorkdirManager();
-          const currentWorkdir = workdirManager.get();
+          const currentWorkdir = getWorkdir();
           const workdirInfo = currentWorkdir ? `当前工作目录: ${currentWorkdir}\n` : '';
           const contextPrefix = `[系统上下文] 当前飞书对话ID: ${chatId}\n\n` +
             workdirInfo +
@@ -1463,11 +1462,10 @@ export class MessageHandler {
   /**
    * Handle restart command from admin user.
    * Supports: 'serve' (default), 'feishu', 'all'.
-   * Uses fire-and-forget detached spawn so the restart script can outlive this process.
+   * Cross-platform: no shell scripts, uses Node.js-native process management.
    */
   private async handleRestartCommand(chatId: string, target: string = 'serve'): Promise<void> {
-    const { execSync, spawn } = await import('child_process');
-    const path = await import('path');
+    const { spawn, execSync } = await import('child_process');
 
     const targetLabels: Record<string, string> = {
       serve: 'OpenCode 服务',
@@ -1476,67 +1474,58 @@ export class MessageHandler {
     };
     const label = targetLabels[target] || target;
 
-    // Map target to script name
-    const scriptNames: Record<string, string> = {
-      serve: 'restart-serve.sh',
-      feishu: 'restart-feishu.sh',
-      all: 'restart-all.sh',
-    };
-    const scriptName = scriptNames[target];
-    if (!scriptName) {
-      await this.feishuApi.sendText(chatId, `❌ 不支持的重启目标: ${target}`);
-      return;
-    }
-
     try {
       await this.feishuApi.sendText(chatId, `🔄 正在重启 ${label}...`);
 
-      const packageRoot = (() => {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-implied-eval
-          const metaUrl = (new Function('return import.meta.url'))();
-          return path.resolve(path.dirname(fileURLToPath(metaUrl)), '..', '..');
-        } catch {
-          return path.resolve(process.cwd());
-        }
-      })();
+      const opencodePort = new URL(this.config.opencodeUrl).port || '19876';
+      const isWin = process.platform === 'win32';
 
-      const possiblePaths = [
-        path.join(process.cwd(), 'connectors', 'feishu', scriptName),
-        path.join(this.opencode.getDirectory(), 'connectors', 'feishu', scriptName),
-        path.join(packageRoot, 'connectors', 'feishu', scriptName),
-        path.join(homedir(), '.config', 'opencode', 'connectors', 'feishu', scriptName),
-      ];
-
-      let scriptPath = '';
-      for (const p of possiblePaths) {
-        try {
-          execSync(`test -f "${p}"`, { stdio: 'ignore' });
-          scriptPath = p;
-          break;
-        } catch {
-          continue;
+      if (target === 'serve' || target === 'all') {
+        // Kill existing process on the port
+        if (isWin) {
+          try {
+            const out = execSync(`netstat -ano | findstr :${opencodePort}`, { encoding: 'utf8' });
+            const outLines = out.split('\n').filter((l: string) => l.includes('LISTENING'));
+            for (const ln of outLines) {
+              const pid = ln.trim().split(/\s+/).pop();
+              if (pid) execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+            }
+          } catch { /* no process on port */ }
+        } else {
+          try { execSync(`lsof -ti :${opencodePort} | xargs kill -9 2>/dev/null || true`, { stdio: 'ignore' }); } catch {}
         }
+        await new Promise(r => setTimeout(r, 1000));
+
+        // Start new opencode serve as detached process
+        const cmd = isWin ? 'opencode.cmd' : 'opencode';
+        const serveChild = spawn(cmd, ['serve', '--port', opencodePort], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        serveChild.unref();
+        log.info({ port: opencodePort }, 'Restarted opencode serve');
       }
 
-      if (!scriptPath) {
-        log.error(`${scriptName} not found`);
-        await this.feishuApi.sendText(chatId, `❌ 找不到重启脚本 connectors/feishu/${scriptName}`);
-        return;
+      if (target === 'feishu' || target === 'all') {
+        // Delete PID file so the new daemon can claim it
+        const PID_FILE = join(homedir(), '.config', 'opencode', 'feishu.pid');
+        try { unlinkSync(PID_FILE); } catch {}
+
+        // Spawn new daemon (detached, survives parent exit)
+        const cliPath = fileURLToPath(import.meta.url)
+          .replace(/[\\/]core[\\/]message-handler\.js$/, `${sep}cli.js`);
+        const feishuChild = spawn(process.execPath, [cliPath, 'start', '--daemon'], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        feishuChild.unref();
+        log.info('Restarted feishu daemon');
+
+        // Schedule current process exit (daemon child is detached, will survive)
+        setTimeout(() => process.exit(0), 1500);
       }
 
-      // Fire-and-forget: spawn the restart script and don't wait for result
-      const child = spawn('bash', [scriptPath, '19876'], {
-        detached: true,
-        stdio: 'ignore',
-        env: {
-          ...process.env,
-          FEISHU_NOTIFY_CHAT_ID: chatId,
-        },
-      });
-      child.unref();
-
-      log.info({ scriptPath, target }, 'Restart script spawned');
+      log.info({ target }, 'Restart completed');
     } catch (err) {
       log.error({ err, target }, 'Restart command failed');
       try {

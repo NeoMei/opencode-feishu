@@ -5,6 +5,23 @@ All notable changes to this project are documented here. This project follows
 
 ## [0.6.4] — 2026-06-10
 
+## [0.6.7] - 2026-06-20
+
+### Fixed
+- `opencode-serve-manager` stop(): 修复 `this.proc` 在 force-kill 超时前被置空的 bug
+- `config.ts`: 错误信息中的配置路径改为动态平台路径（`join(homedir(), ...)）
+
+### Changed
+- `message-handler.ts`: `syncModelOverride()` 及 `handleRestartCommand()` 中的动态 `import('fs')` / `import('path')` 替换为顶层静态导入
+- `.github/workflows/publish.yml`: 新增 Windows/macOS/Ubuntu 测试矩阵（Node 18/20/22）
+- `package.json`: 移除已损坏的 `lint` 脚本
+
+### Removed
+- `scripts/morning-news.js`: 无关的个人早报脚本
+- `connectors/feishu/restart-*.sh`: 已被跨平台 Node.js 重启逻辑取代的 Linux shell 脚本
+- `CLAUDE.md`: 竞品工具指令文件，与 `AGENTS.md` 重叠
+
+
 ### Fixed
 
 - **修复授权卡片不更新的问题**: 用户点击飞书卡片的授权按钮后，回调响应中未携带 `card` 字段，导致原始卡片始终停留在"等待授权"状态，会话卡死。现在在 `handlePermissionCardAction` 和 `handleQuestionCardAction` 的返回值中同步附带 `card: confirmCard`，确保飞书立即更新卡片状态。
@@ -140,3 +157,4 @@ sessions, preflight diagnostics).
 ### Notes
 
 Published on npm as `@neomei/opencode-feishu`. Requires Node.js ≥18.
+

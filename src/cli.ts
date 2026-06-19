@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { startStandalone } from './standalone.js';
 import { SetupWizard } from './setup/wizard.js';
 import { createLogger } from './core/logger.js';
+import { ProfileManager } from './core/profile-manager.js';
 
 const log = createLogger('cli');
 
@@ -302,7 +303,6 @@ profile
   .description('List all profiles')
   .option('--json', 'Emit JSON output')
   .action(async (options) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     const profiles = mgr.list();
 
@@ -326,7 +326,6 @@ profile
   .command('add <name>')
   .description('Add a new profile (copies current config)')
   .action(async (name) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const { ConfigManager } = await import('./core/config.js');
     const mgr = new ProfileManager();
     
@@ -348,7 +347,6 @@ profile
   .command('use <name>')
   .description('Switch to a profile')
   .action(async (name) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     
     if (mgr.use(name)) {
@@ -363,7 +361,6 @@ profile
   .command('delete <name>')
   .description('Delete a profile')
   .action(async (name) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     
     if (mgr.delete(name)) {
@@ -378,7 +375,6 @@ profile
   .command('rename <old> <new>')
   .description('Rename a profile')
   .action(async (oldName, newName) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     
     if (mgr.rename(oldName, newName)) {
@@ -393,7 +389,6 @@ profile
   .command('clone <source> <target>')
   .description('Clone a profile')
   .action(async (source, target) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     
     if (mgr.clone(source, target)) {
@@ -409,7 +404,6 @@ profile
   .description('Show profile configuration')
   .option('--json', 'Emit JSON output')
   .action(async (name, options) => {
-    const { ProfileManager } = await import('./core/profile-manager.js');
     const mgr = new ProfileManager();
     
     const profileName = name || mgr.getActive()?.name;
