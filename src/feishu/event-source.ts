@@ -153,9 +153,11 @@ export class FeishuEventSource extends EventEmitter {
     try {
       if (typeof (this.wsClient as any).getConnectionStatus === 'function') {
         const status = (this.wsClient as any).getConnectionStatus();
-        return status?.state === 'connected' || status?.state === 'reconnecting';
+        return status?.state === 'connected';
       }
-    } catch {}
-    return this.started;
+    } catch (e) {
+      log.warn({ err: (e as Error).message }, 'isConnected check failed');
+    }
+    return false;
   }
 }

@@ -12,6 +12,7 @@ interface UserNameCacheEntry {
 }
 
 const USERNAME_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const USERNAME_CACHE_MAX_SIZE = 10000; // Prevent unbounded growth
 
 export class FeishuAPI {
   private client: Lark.Client;
@@ -167,6 +168,14 @@ export class FeishuAPI {
         params: { user_id_type: 'union_id' },
       });
       const name = res?.data?.user?.name || userId;
+      // Evict oldest entries when cache exceeds max size
+      if (this.userNameCache.size >= USERNAME_CACHE_MAX_SIZE) {
+        const oldest = [...this.userNameCache.entries()]
+          .sort((a, b) => a[1].timestamp - b[1].timestamp)
+          .slice(0, Math.floor(USERNAME_CACHE_MAX_SIZE * 0.1))
+          .map(e => e[0]);
+        for (const key of oldest) this.userNameCache.delete(key);
+      }
       this.userNameCache.set(userId, { name, timestamp: now });
       return name;
     } catch (err) {

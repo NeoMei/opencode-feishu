@@ -469,6 +469,9 @@ export class MessageHandler {
     } catch (err) {
       log.error({ err }, 'Error handling message');
 
+      // Reset session status so it doesn't stay stuck at 'busy'
+      try { this.sessionManager.updateStatus(message.chat_id, 'idle'); } catch {}
+
       try {
         await this.feishuApi.sendText(
           message.chat_id,
@@ -1476,7 +1479,8 @@ export class MessageHandler {
     try {
       await this.feishuApi.sendText(chatId, `🔄 正在重启 ${label}...`);
 
-      const opencodePort = new URL(this.config.opencodeUrl).port || '19876';
+      const portStr = this.config.opencodeUrl ? new URL(this.config.opencodeUrl).port : null;
+      const opencodePort = portStr || '19876';
       const isWin = process.platform === 'win32';
 
       if (target === 'serve' || target === 'all') {
@@ -1486,8 +1490,9 @@ export class MessageHandler {
             const out = execSync(`netstat -ano | findstr :${opencodePort}`, { encoding: 'utf8' });
             const outLines = out.split('\n').filter((l: string) => l.includes('LISTENING'));
             for (const ln of outLines) {
-              const pid = ln.trim().split(/\s+/).pop();
-              if (pid) execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+              const parts = ln.trim().split(/\s+/);
+              const pid = parts[parts.length - 1];
+              if (pid && /^\d+$/.test(pid)) execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
             }
           } catch { /* no process on port */ }
         } else {

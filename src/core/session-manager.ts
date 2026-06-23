@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import type { SessionInfo, PendingInteraction } from '../core/types.js';
@@ -284,7 +284,6 @@ export class SessionManager {
     // Atomic-ish write: write to tmp + rename.
     const tmp = `${this.storagePath}.tmp`;
     writeFileSync(tmp, JSON.stringify(state, null, 2));
-    const { renameSync } = await import('fs');
     renameSync(tmp, this.storagePath);
 
     log.debug({ path: this.storagePath, count: state.sessions.length }, 'Persisted sessions');

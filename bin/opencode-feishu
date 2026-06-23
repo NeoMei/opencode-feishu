@@ -1,2 +1,9 @@
 #!/usr/bin/env node
-import('../dist/cli.js');
+import('../dist/cli.js').catch(err => {
+  if (err.code === 'ERR_MODULE_NOT_FOUND') {
+    console.error('❌ 构建产物缺失。请运行 npm run build 或 npm install -g @neomei/opencode-feishu');
+  } else {
+    console.error('启动失败:', err.message);
+  }
+  process.exit(1);
+});

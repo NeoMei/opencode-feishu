@@ -57,8 +57,15 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
   console.log();
 
   // 2. Ensure OpenCode server is running (auto-start if requested)
-  const opencodePort = parseInt(new URL(config.opencodeUrl).port || '19876', 10);
-  const opencodeHostname = new URL(config.opencodeUrl).hostname || '127.0.0.1';
+  let opencodePort = 19876;
+  let opencodeHostname = '127.0.0.1';
+  try {
+    const u = new URL(config.opencodeUrl);
+    opencodePort = parseInt(u.port || '19876', 10);
+    opencodeHostname = u.hostname || '127.0.0.1';
+  } catch {
+    log.warn({ opencodeUrl: config.opencodeUrl }, 'Invalid opencodeUrl, using defaults');
+  }
   let serveManager: OpenCodeServeManager | undefined;
 
   const serverRunning = await isOpencodeServerRunning(config.opencodeUrl, process.env.OPENCODE_SERVER_PASSWORD);
@@ -79,6 +86,7 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
       log.error({ err }, 'Failed to start OpenCode server');
       console.error('\n❌ Failed to start OpenCode server');
       console.error('   Make sure `opencode` CLI is installed and available in PATH');
+      serveManager?.stop();
       process.exit(1);
     }
   } else {
@@ -101,7 +109,8 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
     console.log('✅ OpenCode connected\n');
   } catch (err) {
     log.error({ err, opencodeUrl: config.opencodeUrl }, 'Failed to connect to OpenCode');
-    const port = new URL(config.opencodeUrl).port || '19876';
+    let port = '19876';
+    try { port = new URL(config.opencodeUrl).port || '19876'; } catch {}
     console.error('\n❌ Failed to connect to OpenCode server');
     console.error(`   URL: ${config.opencodeUrl}`);
     console.error('\n💡 Please start OpenCode server first:');
@@ -189,6 +198,7 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
     console.log('✅ Feishu event stream connected\n');
   } catch (err) {
     log.error({ err }, 'Failed to connect to Feishu');
+      serveManager?.stop();
     process.exit(1);
   }
 
@@ -212,9 +222,13 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
   });
 
   // 11. Handle shutdown
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`\n🛑 Received ${signal}, shutting down...`);
 
+    clearInterval(healthCheckTimer);
     stopStatusWriter();
 
     if (eventHandler) eventHandler.stop();
@@ -233,8 +247,18 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+  process.on('uncaughtException', (err) => {
+    log.error({ err: err.message, stack: err.stack }, 'Uncaught exception');
+    shutdown('uncaughtException');
+    setTimeout(() => process.exit(1), 3000);
+  });
+  process.on('unhandledRejection', (reason) => {
+    log.error({ reason }, 'Unhandled promise rejection');
+  });
+
   // Keep process alive
-  setInterval(() => {}, 1000);
+  // Keep process alive without busy-waiting
+  setInterval(() => {}, 2_147_483_647);
 
   // 12. Health check and auto-restart
   const HEALTH_CHECK_INTERVAL_MS = 30_000;
@@ -260,7 +284,8 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
             } else {
               // Fallback: spawn a new opencode serve process
               const { spawn } = await import('child_process');
-              const child = spawn('opencode', ['serve', '--port', String(opencodePort)], {
+              const cmd = process.platform === 'win32' ? 'opencode.cmd' : 'opencode';
+              const child = spawn(cmd, ['serve', '--port', String(opencodePort)], {
                 detached: true,
                 stdio: 'ignore',
               });
@@ -312,6 +337,6 @@ export async function startStandalone(options: StartStandaloneOptions = {}): Pro
   };
 
   // Run health check periodically
-  setInterval(healthCheck, HEALTH_CHECK_INTERVAL_MS);
+  const healthCheckTimer = setInterval(healthCheck, HEALTH_CHECK_INTERVAL_MS);
   log.info({ intervalMs: HEALTH_CHECK_INTERVAL_MS }, 'Health check started');
 }

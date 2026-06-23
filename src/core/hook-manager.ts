@@ -1,4 +1,6 @@
 import { spawn } from 'child_process';
+import { existsSync } from 'node:fs';
+import { isAbsolute, join as pathJoin } from 'node:path';
 import { createLogger } from './logger.js';
 import type { HookConfig } from './types.js';
 
@@ -33,11 +35,29 @@ export class HookManager {
     }
   }
 
+  private resolveScript(scriptPath: string): { command: string; args: string[] } {
+    const absPath = isAbsolute(scriptPath)
+      ? scriptPath
+      : pathJoin(this.projectDir, scriptPath);
+
+    // On Windows, .sh scripts need to run through bash (Git Bash / WSL).
+    // Look for a .js equivalent first, which runs natively via Node.
+    if (process.platform === "win32" && absPath.endsWith(".sh")) {
+      const jsPath = absPath.replace(/\.sh$/, ".js");
+      if (existsSync(jsPath)) {
+          return { command: process.execPath, args: [jsPath] };
+        }
+      // Fallback: try bash (requires Git Bash or WSL)
+      return { command: "bash", args: [absPath] };
+    }
+
+    // On Unix, .sh scripts are executable directly
+    return { command: absPath, args: [] };
+  }
+
   private execScript(scriptPath: string, ctx: HookContext): Promise<void> {
     return new Promise((resolve) => {
-      const absPath = scriptPath.startsWith('/')
-        ? scriptPath
-        : `${this.projectDir}/${scriptPath}`;
+      const { command, args } = this.resolveScript(scriptPath);
 
       const env: Record<string, string | undefined> = {
         ...process.env,
@@ -52,11 +72,11 @@ export class HookManager {
         }
       }
 
-      const child = spawn(absPath, [], {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 30000,
-      });
+      const child = spawn(command, args, {
+            env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: 30000,
+          });
 
       let stdout = '';
       let stderr = '';
