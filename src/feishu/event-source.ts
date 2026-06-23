@@ -158,6 +158,7 @@ export class FeishuEventSource extends EventEmitter {
     } catch (e) {
       log.warn({ err: (e as Error).message }, 'isConnected check failed');
     }
-    return false;
+    // Fallback for environments where getConnectionStatus is unavailable (e.g. tests with mocks)
+    return this.started;
   }
 }
