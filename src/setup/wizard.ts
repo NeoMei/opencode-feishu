@@ -83,11 +83,25 @@ export class SetupWizard {
       config = await this.runManualSetup();
     }
 
-    // Save configuration
-    this.configManager.save(config);
+    // Save configuration WITHOUT appSecret for security
+    // Use FEISHU_APP_SECRET environment variable instead
+    const { appSecret: _secret, ...safeConfig } = config;
+    this.configManager.save(safeConfig as FeishuConfig);
 
     console.log('\n✅ 配置已保存！');
     console.log(`📁 配置文件: ${this.configManager.getConfigPath()}`);
+
+    // Security guidance
+    console.log('\n🔐 安全提示:');
+    console.log('   App Secret 未写入配置文件，请通过环境变量提供：');
+    if (process.platform === 'win32') {
+      console.log('   setx FEISHU_APP_SECRET "你的AppSecret"');
+      console.log('   或 系统属性 → 环境变量 → 新建 FEISHU_APP_SECRET');
+    } else {
+      console.log('   export FEISHU_APP_SECRET="你的AppSecret"');
+      console.log('   建议写入 ~/.bashrc 或 ~/.zshrc 持久化');
+    }
+    console.log('\n   💡 这样即使配置文件泄露，App Secret 也不会暴露。\n');
 
     // Ask about advanced features
     await this.promptAdvancedHints();

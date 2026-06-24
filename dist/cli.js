@@ -251,14 +251,24 @@ program
 program
     .command('stop')
     .description('Stop the Feishu plugin')
-    .action(() => {
+    .action(async () => {
     if (!existsSync(PID_FILE)) {
         console.log('📭 Plugin is not running');
         return;
     }
     try {
         const pid = parseInt(readFileSync(PID_FILE, 'utf-8').trim());
-        process.kill(pid, 'SIGTERM');
+        // On Windows, SIGTERM is not graceful — use taskkill /F as fallback
+        if (process.platform === 'win32') {
+            const { execSync } = await import('child_process');
+            try {
+                execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+            }
+            catch { }
+        }
+        else {
+            process.kill(pid, 'SIGTERM');
+        }
         console.log(`🛑 Stopped plugin (PID: ${pid})`);
     }
     catch (err) {
